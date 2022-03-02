@@ -1,0 +1,3 @@
+﻿CREATE LOGIN [BigBoss]
+    WITH PASSWORD = N'zVepqumyA@hihGigulal#^remsFT7_&#$!~<l_fjniPJlhRr', SID = 0x5CEB985836E51149AECD0AEEA8D24E62, DEFAULT_LANGUAGE = [русский];
+
