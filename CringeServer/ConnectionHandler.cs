@@ -281,15 +281,20 @@ namespace CringeServer
         // Some lists {
         private List<ClientSocket> clientsSocket = null;
         private List<Thread> threadingStorage = null;
-        private List<responesToUser> responesStorage = null;    
+        private List<responesToUser> responesStorage = null;
+
+        private List<Task> taskStorage = null;
         // Some lists }
 
         // Some mutexes {
+        private Mutex outputConnectionMutex = null;
         private Mutex responesStorageMutex = null;
         private Mutex mut = null;
         private Mutex socketMutex = null;   
         // Some mutexes }        
-
+        private ManualResetEvent allDone = new ManualResetEvent(false);
+        private CancellationTokenSource ts = new CancellationTokenSource();
+        
         // Some info {
         private SomeUsefulStuff.ServerConnectionInformation serverInfo = null;
         // Some info }
@@ -300,7 +305,7 @@ namespace CringeServer
         public ConnectionHandler(int iPort = 8005, string iInputIP = "192.168.1.119", int iMaxListen = 50)
         {
             LOG.writeLogs = true;
-
+            
             // Init variables {
             serverInfo = new SomeUsefulStuff.ServerConnectionInformation(iPort, iInputIP, iMaxListen);
             // 
@@ -320,35 +325,35 @@ namespace CringeServer
             //
             serverInfo.serverIsWork = true;
             
-            LOG.printLogInFile("Server_is_start");
+            LOG.printLogInFile("Server_is_start.");
 
             clientsSocket = new List<ClientSocket>();
             threadingStorage = new List<Thread>();
             responesStorage = new List<responesToUser>();
+            taskStorage = new List<Task>();
 
             responesStorageMutex = new Mutex();
             mut = new Mutex();
             socketMutex = new Mutex();
+            outputConnectionMutex = new Mutex();
 
             handler = new DBhandler(DBinfo.serverName, DBinfo.dataBaseName, DBinfo.userName, DBinfo.password);
 
             // Some threads {
-            Thread vThread = new Thread(getServerInformation);
-            Thread socketsThread = new Thread(listeningExistSockets);
+            /*Thread socketsThread = new Thread(listeningExistSockets);
             Thread outputThread = new Thread(outputConnectionHandler);
             // Some threads }
 
             //vThread.Start();
 
-            threadingStorage.Add(vThread);
             threadingStorage.Add(socketsThread);
-            threadingStorage.Add(outputThread);
+            threadingStorage.Add(outputThread);*/
 
             
             handler.startHandler();
 
 
-            LOG.printLogInFile("DataBaseHandler_is_start");
+            LOG.printLogInFile("DataBaseHandler_is_start.");
         }
 
         public bool rebindIPPoint()
@@ -372,14 +377,6 @@ namespace CringeServer
             return false;
         }
 
-        public void getServerInformation()
-        {
-            while (serverInfo.serverIsWork)
-            {
-                printServerInfo();
-                Thread.Sleep(500);
-            }
-        }
 
         public void printServerInfo()
         {
@@ -388,35 +385,68 @@ namespace CringeServer
                 serverInfo.printCurrentServerInformation();
             }
         }
-
-        public void startWork()
+       
+        private bool reconnectListenSocket()
         {
-            foreach (Thread t in threadingStorage)
+            try
             {
-                if (t.ThreadState == ThreadState.Unstarted)
-                {
-                    t.Start();
-                }
-                else if (t.ThreadState == ThreadState.Stopped)
-                {
-                    t.Start();
-                }
+                ipPoint.Address = IPAddress.Parse(serverInfo.inputIP);
+                ipPoint.Port = serverInfo.port;
+
+                listenSocket = new Socket(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp);
+                listenSocket.Bind(ipPoint);
+                listenSocket.Listen(serverInfo.maxListen);
+            }
+            catch (Exception e)
+            {
+                Console.WriteLine(e.Message.ToString());
+                return false;
             }
 
-            inputConnectionHandler();
+            return true;
+        }
+        private bool closeListenSocketForced()
+        {
+            try
+            {
+                listenSocket.Shutdown(SocketShutdown.Both);
+                listenSocket.Close();
+                listenSocket.Dispose();
+            }
+            catch (Exception e)
+            {
+                Console.WriteLine(e.Message.ToString());
+            }
 
-            
+            return true;
         }
 
-        public void stopWork()
+        public void stopWork(int _seconds = 0)
         {
-            foreach (Thread t in threadingStorage)
+            serverInfo.serverIsWork = false;
+            //closeListenSocketForced();
+            ts.Cancel();
+
+            Console.WriteLine("Server work is stopped......");
+            Console.WriteLine($"Wating {_seconds} seconds....");
+            Thread.Sleep(_seconds * 1000);
+        }
+
+        public void continueWork()
+        {
+            Console.WriteLine("Server work is continues.....");
+            
+            foreach (Task t in taskStorage)
             {
-                if (t.ThreadState == ThreadState.Running)
-                {
-                    
-                }
+                Console.WriteLine(t.Status.ToString());
+                t.Dispose();
             }
+
+            serverInfo.serverIsWork = true;
+            //reconnectListenSocket();
+            allDone.Set();
+
+            workLoop();
         }
 
         public void workLoop()
@@ -425,11 +455,13 @@ namespace CringeServer
             {
                 while (serverInfo.serverIsWork)
                 {
-                    outputConnectionHandlerB();
-                    listeningExistSocketsB();
+                    outputConnectionHandler();
+                    listeningExistSockets();
                     Thread.Sleep(500);
                 }
             });
+            taskStorage.Add(mainTusk);
+
             Task userTransactionsTask = Task.Run(() =>
             {
                 while (serverInfo.serverIsWork)
@@ -438,15 +470,27 @@ namespace CringeServer
                     Thread.Sleep(500);
                 }
             });
+            taskStorage.Add(userTransactionsTask);
 
-            inputConnectionHandler();
+            Task firstConnectionHandleTask = Task.Run(() =>
+            {
+                while (serverInfo.serverIsWork)
+                {
+                    inputConnectionHandler();
+                    Thread.Sleep(500);
+                }
+
+            });
+            taskStorage.Add(firstConnectionHandleTask);
+
+            //inputConnectionHandler();
         }
 
 
 
 // Service function {
 
-        private void addInRequestStorage(int userID, string comand)
+        private void addInResponesStorage(int userID, string comand)
         {
             responesStorageMutex.WaitOne();
 
@@ -459,7 +503,7 @@ namespace CringeServer
             responesStorageMutex.ReleaseMutex();
         }
 
-        private void deleteFromRequestStorage(int userID, string comand)
+        private void deleteFromResponesStorage(int userID, string comand)
         {
             responesStorageMutex.WaitOne();
 
@@ -519,119 +563,58 @@ namespace CringeServer
 
         public void outputConnectionHandler()
         {
-            while (serverInfo.serverIsWork)
-            {
-                foreach (ClientSocket s in clientsSocket.ToList())
-                {
-                    foreach(responesToUser it in responesStorage.ToList())
-                    {
-                        if (s.clientID == it.userID)
-                        {
-                            CringeInfo temp = handler.getFromRequestStorage(it.userID, it.userComand);
-                                
-                            if (temp.filled)
-                            {
-                                if (sendMessageToClient(ref temp))
-                                {
-                                    LOG.printLogInFile($"Message for user ID={it.userID} " +
-                                        $"with command={it.userComand} was succesful sended.");
-
-                                    deleteFromRequestStorage(it.userID, it.userComand);                                  
-                                }
-                            }
-                            
-                        }
-                    }
-                }
-                Thread.Sleep(500);
-            }
-        }
-
-        public void outputConnectionHandlerB()
-        {
             foreach (ClientSocket s in clientsSocket.ToList())
             {
-                if (s.isBusy)
-                    continue;
-                s.isBusy = true;
-
                 foreach (responesToUser it in responesStorage.ToList())
                 {
-                    if (it.isHandle)
-                        continue;
-
                     if (s.clientID == it.userID)
                     {
-                        it.isHandle = true;
+                        CringeInfo temp = handler.getFromRequestStorage(it.userID, it.userComand);
+                        deleteFromResponesStorage(it.userID, it.userComand);
+
                         // Task {
                         Task getInfoTask = Task.Run(() =>
                         {
-                            CringeInfo temp = handler.getFromRequestStorage(it.userID, it.userComand);
-
                             if (temp.filled)
                             {
-                                if (sendMessageToClient(ref temp))
+                                int count = 0;
+                                while (!sendMessageToClient(ref temp))
                                 {
-                                    LOG.printLogInFile($"Message for user ID={it.userID} " +
-                                        $"with command={it.userComand} was succesful sended.");
+                                    Thread.Sleep(300);
 
-                                    deleteFromRequestStorage(it.userID, it.userComand);
+                                    ++count;
+                                    if (count == 10)
+                                    {
+                                        LOG.printLogInFile($"Message for user ID={it.userID} " +
+                                            $"with command={it.userComand} was not sended (try count out of range).", "err");
+                                    }
                                 }
+                                LOG.printLogInFile($"Message for user ID={it.userID} " +
+                                    $"with command={it.userComand} was succesful sended.");
                             }
-                            s.isBusy = false;
+
                         });
                         // Task }
                     }
                 }
-                s.isBusy = false;
             }
+            //////////
         }
-
+        //
         public void listeningExistSockets()
-        {
-            while (serverInfo.serverIsWork)
-            {
-                try
-                {
-                    //
-                    foreach (ClientSocket s in clientsSocket.ToList())
-                    {
-                        if (s.socketAvailable())
-                        {                            
-                            string ans = s.getStringFromClient();
-                            commandHandler(ans);
-                        }
-                    }
-                    //
-                }
-                catch (Exception e)
-                {
-                    LOG.printLogInFile(e.Message.ToString(), "err");
-                }
-                Thread.Sleep(500);
-            }
-        }
-
-        public void listeningExistSocketsB()
         {
             try
             {
                 //
                 foreach (ClientSocket s in clientsSocket.ToList())
                 {
-                    if (s.isBusy)
-                        continue;
-
                     if (s.socketAvailable())
                     {
-                        s.isBusy = true;
                         Task tempTask = Task.Run(() =>
                         {
                             commandHandler(s.getStringFromClient());
-                            s.isBusy = false;
                         });
                     }
-                    s.isBusy = false;
                 }
                 //
             }
@@ -641,36 +624,33 @@ namespace CringeServer
             }
 
         }
-
+        //
+        // Assync cathc input connection {
         public void inputConnectionHandler()
         {
-            //threadingStorage[1].Start();
-            //threadingStorage[2].Start();
-            
-            while (serverInfo.serverIsWork)
+            try
             {
-                try
-                { 
-                    //
-                    Socket handler = listenSocket.Accept();
-                    string comand = socketHandler(ref handler);
-                    string[] reciveComandData = comand.Split(';');
-
-                    ClientSocket s = new ClientSocket(Convert.ToInt32(reciveComandData[1]),ref handler);
-                    addClientSocket(ref s);
-                    
-                    commandHandler(comand);
-
-                    Thread.Sleep(500);
-                    //
-                 }
-                 catch (Exception e)
-                 {
-                    LOG.printLogInFile(e.Message.ToString(), "err");
-                 }
+                listenSocket.BeginAccept(new AsyncCallback(assynchMessageHandler), listenSocket);
             }
-                       
+            catch (Exception e)
+            {
+                LOG.printLogInFile(e.Message.ToString(), "err");
+            }
+
         }
+        private void assynchMessageHandler(IAsyncResult ar)
+        {
+            Socket handler = ((ar.AsyncState as Socket).EndAccept(ar));
+
+            string comand = socketHandler(ref handler);
+            string[] reciveComandData = comand.Split(';');
+
+            ClientSocket s = new ClientSocket(Convert.ToInt32(reciveComandData[1]), ref handler);
+            addClientSocket(ref s);
+
+            commandHandler(comand);
+        }
+        // Assync cathc input connection }
 
         // Build and return string from current bytes in socket
         private string socketHandler(ref Socket fillSocket)
@@ -726,12 +706,12 @@ namespace CringeServer
 
                 case ("get_cringe_collection"):
                     handler.getCringeCollectionO(Convert.ToInt32(reciveComandData[1]), reciveComandData[0]);
-                    addInRequestStorage(Convert.ToInt32(reciveComandData[1]), reciveComandData[0]);
+                    addInResponesStorage(Convert.ToInt32(reciveComandData[1]), reciveComandData[0]);
                     break;
 
                 case ("get_random_cringe_info"):
                     handler.getRandomCringeO(Convert.ToInt32(reciveComandData[1]), reciveComandData[0]);
-                    addInRequestStorage(Convert.ToInt32(reciveComandData[1]), reciveComandData[0]);
+                    addInResponesStorage(Convert.ToInt32(reciveComandData[1]), reciveComandData[0]);
                     break;
 
                 case ("get_messages_in_room_on_id"):
@@ -741,7 +721,7 @@ namespace CringeServer
                 
 
                 default:
-                    //sendMessageToClient(Convert.ToInt32(reciveComandData[1]), "This comand is not exist.");
+                    sendMessageToClient(Convert.ToInt32(reciveComandData[1]), "This comand is not exist.");
                     break;
             }
 

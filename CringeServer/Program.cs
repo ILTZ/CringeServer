@@ -30,6 +30,9 @@ namespace CringeServer
                 //handler.inputConnectionHandler();
                 //handler.startWork();
                 handler.workLoop();
+                //Thread.Sleep(1000);
+                //handler.stopWork(3);
+                //handler.continueWork();
             }
             catch (Exception ex)
             {
@@ -43,7 +46,7 @@ namespace CringeServer
             Thread.Sleep(5000);
             string s = dbH.getFromRequestPool(1, "get_cringe_collection");
             Console.WriteLine(s);*/
-
+      
             Thread.Sleep(5000);
         }
     }

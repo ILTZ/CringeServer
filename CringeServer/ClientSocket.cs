@@ -2,6 +2,7 @@
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
+using System.Threading;
 using System.Threading.Tasks;
 using System.Net;
 using System.Net.Sockets;
@@ -21,6 +22,8 @@ namespace CringeServer
         public bool isConnected { get; }
         public bool isDisconnected { get; }
 
+        Mutex helpMut = null;
+
 
         public ClientSocket(int _userID, ref Socket _baseSocketRef)
         {
@@ -29,6 +32,8 @@ namespace CringeServer
 
             isConnected = true;
             isDisconnected = false;
+
+            helpMut = new Mutex();
         }
 
 
@@ -46,6 +51,7 @@ namespace CringeServer
                 bytes = clientSocket.Receive(data);
                 builder.Append(Encoding.Unicode.GetString(data, 0, bytes));
             } while (clientSocket.Available > 0);
+
 
             return builder.ToString();
         }
@@ -72,6 +78,8 @@ namespace CringeServer
 
         public bool sendStringToClient(ref String stringToClient)
         {
+            helpMut.WaitOne();
+
             try
             {
                 clientSocket.Send(Encoding.Unicode.GetBytes(stringToClient));
@@ -82,11 +90,15 @@ namespace CringeServer
                 return false;
             }
             
+            helpMut.ReleaseMutex();
+
             return true;
         }
 
         public bool sendStringToClient(String stringToClient)
         {
+            helpMut.WaitOne();
+
             try
             {
                 clientSocket.Send(Encoding.Unicode.GetBytes(stringToClient));
@@ -96,6 +108,8 @@ namespace CringeServer
                 LOG.printLogInFile(ex.Message.ToString(), "err");
                 return false;
             }
+
+            helpMut.ReleaseMutex();
 
             return true;
         }
@@ -134,6 +148,8 @@ namespace CringeServer
 
         public bool sendInfoToClient(ref CringeInfo _respones)
         {
+            helpMut.WaitOne();
+
             try
             {
                 //
@@ -170,12 +186,15 @@ namespace CringeServer
                         sendStringToClient("end_respones");
                 }
 
+                helpMut.ReleaseMutex();
+                
                 return true;
                 //
             }
             catch (Exception ex)
             {
                 LOG.printLogInFile(ex.Message.ToString(), "err");
+                helpMut.ReleaseMutex();
                 return false;
             }
 
