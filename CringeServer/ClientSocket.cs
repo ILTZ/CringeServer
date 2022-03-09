@@ -36,7 +36,7 @@ namespace CringeServer
             helpMut = new Mutex();
         }
 
-
+        const int connectionTryCount = 20;
        
 
 
@@ -167,7 +167,8 @@ namespace CringeServer
 
                     foreach (byte[] bd in _respones.byteDataStorage)
                     {
-                        sendBytesToClient(bd);
+                        if (clientReadyToRecive())
+                            sendBytesToClient(bd);
                     }
 
                     if (clientReadyToRecive())
@@ -196,25 +197,32 @@ namespace CringeServer
                 LOG.printLogInFile(ex.Message.ToString(), "err");
                 helpMut.ReleaseMutex();
                 return false;
-            }
-
-
+            }        
 
             return true;
         }
-
 
 // Setvice func {
 
         private bool clientReadyToRecive()
         {
-            while (true)
+            int tryCount = 0;
+            bool wating = true;
+
+            while (wating)
             {
                 if (getStringFromClient() == "ready;" + Convert.ToString(clientID))
                     return true;
 
                 if (getStringFromClient() == "close_connection;" + Convert.ToString(clientID))
                     return false;
+
+                Thread.Sleep(500);
+                /*++tryCount;
+
+                if (tryCount == connectionTryCount)
+                    wating = false;*/
+                
             }
 
             return false;

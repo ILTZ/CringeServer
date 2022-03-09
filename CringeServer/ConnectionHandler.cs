@@ -22,6 +22,13 @@ namespace SomeUsefulStuff
         public const string password = "11112222";
     }
 
+    public static class ServerConectionInfo
+    {
+        public static List<int> availablePorts = new List<int>();
+        public static List<string> availableIP = new List<string>();
+        public static int maxListeners = 50;
+    }
+
     public static class LogginProcedures
     {
         public static bool writeLogs { get; set; }
