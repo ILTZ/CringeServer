@@ -73,10 +73,6 @@ namespace CringeServer
     {
         static string ConnectionString = @"Data Source=MYPC\SQLEXPRESS;Integrated Security=True;Connect Timeout=30;Encrypt=False;TrustServerCertificate=False;ApplicationIntent=ReadWrite;MultiSubnetFailover=False";
 
-        private SqlConnection mainConnection = null;
-        private SqlConnection subConnection = null;
-        private List<SqlConnection> connectionStorage = null;
-
         private SqlConnectionStringBuilder sBuilder = null;
 
         private Mutex connectionMutex = new Mutex();
@@ -122,22 +118,17 @@ namespace CringeServer
 
                 try
                 {
-                    mainConnection = new SqlConnection(ConnectionString);
-                    mainConnection.Open();
-                    mainConnection.Close();
-
-                    subConnection = new SqlConnection(ConnectionString);
-                    subConnection.Open();
-                    subConnection.Close();
+                    using (SqlConnection conn = new SqlConnection(ConnectionString))
+                    {
+                        conn.Open();
+                        conn.Close();
+                    }
                 }
                 catch (Exception ex)
                 {
                     LOG.printLogInFile(ex.Message.ToString(), "crash");
                 }
 
-                connectionStorage = new List<SqlConnection>();
-                connectionStorage.Add(mainConnection);
-                connectionStorage.Add(subConnection);
 
                 queryStorage = new List<InputQuery>();
 
@@ -196,15 +187,6 @@ namespace CringeServer
             reader.DisposeAsync();
             return temp;
         }
-        public void refreshConnection()
-        {
-            connectionMutex.WaitOne();
-
-            mainConnection = new SqlConnection(ConnectionString);
-            subConnection = new SqlConnection(ConnectionString);
-
-            connectionMutex.ReleaseMutex();
-        }
         private void printQueryResult(string queryResult)
         {
             string[] rowsString = queryResult.Split("//");
@@ -258,11 +240,13 @@ namespace CringeServer
         public void continueHandler()
         {
             Console.WriteLine("DBHandler is working....");
+            serverWorkStatus = true;
 
             foreach (Task t in taskStorage)
             {
                 t.Dispose();
             }
+            taskStorage.Clear();
 
             startHandler();
         }
@@ -334,12 +318,9 @@ namespace CringeServer
             return new CringeInfo();
         }
 
-        public void workProcess()
-        {
 
-        }
 
-        // Only check exist request from client and add new respones in storage that will be handl in other thread.
+
         /*public void DBHandlerMainProcess()
         {
             while (appWorkStatus)
@@ -368,7 +349,8 @@ namespace CringeServer
                 }
             }
         }*/
-
+        
+        // Only check exist request from client and add new respones in storage that will be handl in other thread.
         public void DBHandlerMainProcessAssynch()
         {
             foreach(InputQuery q in queryStorage.ToList())

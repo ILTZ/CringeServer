@@ -30,9 +30,9 @@ namespace CringeServer
                 //handler.inputConnectionHandler();
                 //handler.startWork();
                 handler.workLoop();
-                //Thread.Sleep(1000);
-                //handler.stopWork(3);
-                //handler.continueWork();
+                Thread.Sleep(1000);
+                handler.stopWork(3);
+                handler.continueWork();
             }
             catch (Exception ex)
             {

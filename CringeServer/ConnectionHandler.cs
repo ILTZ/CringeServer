@@ -346,7 +346,7 @@ namespace CringeServer
 
             handler = new DBhandler(DBinfo.serverName, DBinfo.dataBaseName, DBinfo.userName, DBinfo.password);
 
-            handler.startHandler();
+            
 
 
             LOG.printLogInFile("DataBaseHandler_is_start.");
@@ -423,6 +423,8 @@ namespace CringeServer
             //closeListenSocketForced();
             ts.Cancel();
 
+            handler.stopHandler();
+
             Console.WriteLine("Server work is stopped......");
             Console.WriteLine($"Wating {_seconds} seconds....");
             Thread.Sleep(_seconds * 1000);
@@ -437,6 +439,7 @@ namespace CringeServer
                 Console.WriteLine(t.Status.ToString());
                 t.Dispose();
             }
+            taskStorage.Clear();
 
             serverInfo.serverIsWork = true;
             //reconnectListenSocket();
@@ -478,6 +481,8 @@ namespace CringeServer
 
             });
             taskStorage.Add(firstConnectionHandleTask);
+
+            handler.continueHandler();
 
             //inputConnectionHandler();
         }
