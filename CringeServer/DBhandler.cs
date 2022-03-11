@@ -251,6 +251,17 @@ namespace CringeServer
             startHandler();
         }
 
+        public void printDBInfo()
+        {
+            Console.WriteLine("///////////////////////////////////////////////////////////");
+            Console.WriteLine("_______________________DATABASE INFO_______________________");
+            Console.WriteLine($"Current query from users:\t{queryStorage.Count}");
+            Console.WriteLine($"Current respones to users:\t{responesStorage.Count}");
+            Console.WriteLine($"Current work status:\t{serverWorkStatus}");
+
+            Console.WriteLine("///////////////////////////////////////////////////////////");
+        }
+
         // Set status function }
 
         private void addQueryInStorage(int _ID,ref SqlCommand _comand, string _firstComand, string _method)

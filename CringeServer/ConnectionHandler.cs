@@ -233,8 +233,8 @@ namespace SomeUsefulStuff
         {
             Console.Clear();
 
-            Console.WriteLine("/////////////////////////////////////////");
-            Console.WriteLine("_______________SERVER INFO_______________");
+            Console.WriteLine("///////////////////////////////////////////////////////////");
+            Console.WriteLine("_______________________SERVER INFO_________________________");
             Console.WriteLine($"Current server IPv4:\t\t{getCurrentMachineIP()}");
             Console.WriteLine($"Current server IPv6:\t\t{getCurrentMachineIP("IPv6")}");
             Console.WriteLine($"Current thread/rwthread:\t{getCurrentThreadCount()}/{getCurrentThreadCount("maxrw")}");
@@ -245,7 +245,7 @@ namespace SomeUsefulStuff
             Console.WriteLine($"Current connection count:\t{currentConnectionCount}");
             Console.WriteLine($"Current respones is waiting:\t{currentResponesIsWating}");
 
-            Console.WriteLine("/////////////////////////////////////////");
+            Console.WriteLine("///////////////////////////////////////////////////////////");
         }
 
     }
@@ -466,6 +466,7 @@ namespace CringeServer
                 while (serverInfo.serverIsWork)
                 {
                     printServerInfo();
+                    handler.printDBInfo();
                     Thread.Sleep(500);
                 }
             });
