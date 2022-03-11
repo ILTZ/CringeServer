@@ -85,12 +85,12 @@ namespace SomeUsefulStuff
 
             // 
             if (_param == "err")
-                File.AppendAllText(pathToFile, "************************ERROR************************");
+                File.AppendAllText(pathToFile, "************************ERROR************************\n");
 
             File.AppendAllText(pathToFile, (DateTime.Now.ToLongTimeString() + logWord + _logMessage + "\n"));
 
             if (_param == "err")
-                File.AppendAllText(pathToFile, "*****************************************************");
+                File.AppendAllText(pathToFile, "*****************************************************\n");
             //
         }
 
@@ -346,17 +346,6 @@ namespace CringeServer
 
             handler = new DBhandler(DBinfo.serverName, DBinfo.dataBaseName, DBinfo.userName, DBinfo.password);
 
-            // Some threads {
-            /*Thread socketsThread = new Thread(listeningExistSockets);
-            Thread outputThread = new Thread(outputConnectionHandler);
-            // Some threads }
-
-            //vThread.Start();
-
-            threadingStorage.Add(socketsThread);
-            threadingStorage.Add(outputThread);*/
-
-            
             handler.startHandler();
 
 

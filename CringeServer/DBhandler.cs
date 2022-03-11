@@ -77,19 +77,16 @@ namespace CringeServer
         private SqlConnection subConnection = null;
         private List<SqlConnection> connectionStorage = null;
 
-
         private SqlConnectionStringBuilder sBuilder = null;
-
-        
 
         private Mutex connectionMutex = new Mutex();
         private Mutex customCommandMutex = new Mutex();
         private Mutex responesLockMutex = new Mutex();
 
         // Storage for query that will be handle
-        private Dictionary<int, CringeInfo> queryPool = null;
+        //private Dictionary<int, CringeInfo> queryPool = null;
         // Storage for request 
-        private Dictionary<int, CringeInfo> responesPool = null;
+        //private Dictionary<int, CringeInfo> responesPool = null;
         //
         private List<CringeInfo> responesStorage = null;
         //
@@ -101,12 +98,11 @@ namespace CringeServer
         private bool serverWorkStatus = false;
         private bool appWorkStatus = false;
 
-        Thread subT = null;
-
 
 
         int currentCringeCount = 0;
 
+        List<Task> taskStorage = null;
 
         public bool getServerStatus()
         {
@@ -143,20 +139,20 @@ namespace CringeServer
                 connectionStorage.Add(mainConnection);
                 connectionStorage.Add(subConnection);
 
-
-                subT = new Thread(DBHandlerMainProcess);
-
-                queryPool = new Dictionary<int, CringeInfo>();
-                responesPool = new Dictionary<int, CringeInfo>();
                 queryStorage = new List<InputQuery>();
 
                 responesStorage = new List<CringeInfo>();
+
+                taskStorage = new List<Task>();
             }
             catch (SqlException e)
             {
                 Console.WriteLine(e.ToString());
                 return;
             }
+
+            serverWorkStatus = true;
+            appWorkStatus = true;
 
         }
         // Service function {
@@ -223,20 +219,6 @@ namespace CringeServer
                 Console.WriteLine();
             }
         }
-        public string getDBHandlerStatus()
-        {
-            string serverStatus = "";
-
-            serverStatus += "\n///////////////////////////////////////////";
-            serverStatus += "\n_______________DBHandler_INFO______________";
-            serverStatus += $"\nServer is work\t {Convert.ToString(serverWorkStatus)}";
-            serverStatus += $"\nRequest in pool\t {queryPool.Count}";
-            serverStatus += $"\nResponse in pool\t {responesPool.Count}";
-
-            serverStatus += "\n///////////////////////////////////////////";
-
-            return serverStatus;
-        }
 
         // Service function }
 
@@ -244,10 +226,16 @@ namespace CringeServer
         // Set status function {
         public void startHandler()
         {
-            serverWorkStatus = true;
-            appWorkStatus = true;
-
-            subT.Start();
+            Task mainTask = Task.Run(() =>
+            {
+                while (serverWorkStatus)
+                {
+                    DBHandlerMainProcessAssynch();
+                    Thread.Sleep(100);
+                }
+            });
+            taskStorage.Add(mainTask);
+            //subT.Start();
         }
         public void stopHandler()
         {
@@ -255,15 +243,28 @@ namespace CringeServer
             {
                 serverWorkStatus = false;
 
+                foreach (Task t in taskStorage)
+                {
+                    if (t.Status != TaskStatus.RanToCompletion)
+                    {
+                        Console.WriteLine("DBHandler stoping....");
+                        Thread.Sleep(300);
+                    }
+                }
+                Console.WriteLine("DBHandler is stoped.");
 
             }
         }
-        public void closeApp()
+        public void continueHandler()
         {
-            if (appWorkStatus)
+            Console.WriteLine("DBHandler is working....");
+
+            foreach (Task t in taskStorage)
             {
-                appWorkStatus = false;
+                t.Dispose();
             }
+
+            startHandler();
         }
 
         // Set status function }
@@ -339,7 +340,7 @@ namespace CringeServer
         }
 
         // Only check exist request from client and add new respones in storage that will be handl in other thread.
-        public void DBHandlerMainProcess()
+        /*public void DBHandlerMainProcess()
         {
             while (appWorkStatus)
             {
@@ -366,9 +367,44 @@ namespace CringeServer
                     }
                 }
             }
+        }*/
+
+        public void DBHandlerMainProcessAssynch()
+        {
+            foreach(InputQuery q in queryStorage.ToList())
+            {
+                switch (q.method)
+                {
+                    case "get":
+                        InputQuery tempQ = q;
+                        deleteQueryFromStorage(q);
+                        Task getTask = Task.Run(() =>
+                        { 
+                            while (!executeCustomQueryAsynch(ref tempQ))
+                            {
+                                Thread.Sleep(500);
+                            }
+                            tempQ.sqlComand.Dispose();
+                        });
+                        break;
+
+                    case "set":
+                        InputQuery tempQ2 = q;
+                        deleteQueryFromStorage(q);
+                        Task setTask = Task.Run(() =>
+                        {
+                            while (!executeNonQueryAssynch(ref tempQ2))
+                            {
+                                Thread.Sleep(500);
+                            }
+                            tempQ2.sqlComand.Dispose();
+                        });
+                        break;
+                }
+            }
         }
 
-        public CringeInfo executeCustomQueryB(SqlCommand comand)
+        /*public CringeInfo executeCustomQueryB(SqlCommand comand)
         {
             bool comandExecuted = false;
 
@@ -419,19 +455,63 @@ namespace CringeServer
             LOG.printLogInFile("DBHandler::executeCuxtomQuery::main_loop_doesn't_work!", "err");
 
             return new CringeInfo();
+        }*/
+
+        public bool executeCustomQueryAsynch(ref InputQuery _query)
+        {
+            try
+            {
+                SqlDataReader r = null;
+                CringeInfo temp = new CringeInfo();
+
+                using (SqlConnection con = new SqlConnection(ConnectionString))
+                {
+                    con.OpenAsync();
+                    _query.sqlComand.Connection = con;
+
+                    using (r = _query.sqlComand.ExecuteReader())
+                    {
+                        temp = readerToCringeInfo(ref r);
+                    }
+
+                    con.CloseAsync();
+                }
+
+                temp.userID = _query.userID;
+                temp.command = _query.firstComand;
+                addResponesInStorage(ref temp);
+            }
+            catch(Exception e)
+            {
+                LOG.printLogInFile(e.Message.ToString(), "err");
+                return false;
+            }
+
+            return true;
         }
 
-        private void executeNonQuery(SqlCommand comand)
+        private bool executeNonQueryAssynch(ref InputQuery _query)
         {
-            bool comandExecuted = false;
-
-            while (!comandExecuted)
+            try
             {
-                foreach (SqlConnection con in connectionStorage)
+                using (SqlConnection con = new SqlConnection(ConnectionString))
                 {
-                    
+                    con.OpenAsync();
+
+                    _query.sqlComand.Connection = con;
+
+                    int r = _query.sqlComand.ExecuteNonQuery();
+
+                    con.CloseAsync();
                 }
+
             }
+            catch (Exception e)
+            {
+                LOG.printLogInFile(e.Message.ToString(), "err");
+            }
+
+            return true; 
         }
         
         // Build query to data base {
@@ -450,6 +530,7 @@ namespace CringeServer
 
         }
 
+        //done
         private void getCringeCollection(int _userID, string _firstComand)
         {
             string SqlExpression = "CringeDataBase.dbo.getCringeCollectionOnUserID";
@@ -464,7 +545,7 @@ namespace CringeServer
 
             addQueryInStorage(_userID,ref com, _firstComand, "get");
         }
-
+        //done
         private void getRandomCringe(int _userID, string _firstComand)
         {
             string SqlExpression = "CringeDataBase.dbo.getRandomCringeInformation";
@@ -473,7 +554,7 @@ namespace CringeServer
 
             addQueryInStorage(_userID,ref com, _firstComand, "get");   
         }
-
+        //done
         private void addCringeInCollection(int _userID, int _cringeID, string _firstCommand)
         {
             string sqlExpression = "CringeDataBase.dbo.addCringeInCringeCollection";

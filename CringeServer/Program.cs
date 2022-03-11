@@ -47,7 +47,7 @@ namespace CringeServer
             string s = dbH.getFromRequestPool(1, "get_cringe_collection");
             Console.WriteLine(s);*/
       
-            Thread.Sleep(5000);
+            Thread.CurrentThread.Join();
         }
     }
 }
