@@ -35,7 +35,7 @@ namespace SomeUsefulStuff
 
         private static int crashCount = 0;
         private static int logCount = 0;
-        private static int errorCount = 0;
+        public static int errorCount = 0;
 
 
         // _param define path and description of log.
@@ -66,7 +66,6 @@ namespace SomeUsefulStuff
                 logWord = "::CRUSH::";
                 ++crashCount;
             }
-
 
             if (!(Directory.Exists(Directory.GetParent(Directory.GetCurrentDirectory()).ToString() + @"\Logs")))
             {
@@ -140,6 +139,11 @@ namespace SomeUsefulStuff
         // Some work process bool var }
 
 
+        //List<string> outputInfoStrings = new List<string>();
+        Dictionary<string, string> outputInfoStrings = new Dictionary<string, string>();
+
+        Mutex consoleMutex = new Mutex();
+
         public ServerConnectionInformation(int _port = 8005, string _inputIP = "192.168.0.1", int _maxListen = 50)
         {
             port = _port;
@@ -204,34 +208,53 @@ namespace SomeUsefulStuff
         public void dropCurrentConnectionCount()
         {
             currentConnectionCount = 0;
+            redrawInfo("connection_count");
         }
         public void increseCurrentConnectionCount()
         {
             currentConnectionCount++;
+            redrawInfo("connection_count");
         }
         public void decreaseCurrentConnectionCount()
         {
             --currentConnectionCount;
+            redrawInfo("connection_count");
         }
         //
         //
         public void dropCurrentResponesIsWating()
         {
             currentResponesIsWating = 0;
+            redrawInfo("respones");
         }
         public void increaseCurrentResponesIsWating()
         {
             currentResponesIsWating++;
+            redrawInfo("respones");
         }
         public void decreaseCurrentResponesIsWating()
         {
             currentResponesIsWating--;
+            redrawInfo("respones");
         }
         //
         //
         public void printCurrentServerInformation()
         {
             Console.Clear();
+
+            outputInfoStrings.Add("first_sep" ,"///////////////////////////////////////////////////////////");   //0
+            outputInfoStrings.Add("title" ,"_______________________SERVER INFO_________________________");   //1
+            outputInfoStrings.Add("ipv4" ,$"Current server IPv4:\t\t{getCurrentMachineIP()}");              //2
+            outputInfoStrings.Add("ipv6", $"Current server IPv6:\t\t{getCurrentMachineIP("IPv6")}");    //3
+            outputInfoStrings.Add("threads", $"Current thread/rwthread:\t{getCurrentThreadCount()}/{getCurrentThreadCount("maxrw")}"); //4
+            outputInfoStrings.Add("errors", $"Current error count:\t\t{LOG.getErrorCount()}");    //5
+            outputInfoStrings.Add("crashs", $"Current crash count:\t\t{LOG.getCrashCount()}");    //6
+            outputInfoStrings.Add("logs", $"Current log count:\t\t{LOG.getLogCount()}");    //7
+            outputInfoStrings.Add("work_state", $"Connection handler is work:\t" + serverIsWork.ToString());  //8
+            outputInfoStrings.Add("connection_count", $"Current connection count:\t{currentConnectionCount}");  //9
+            outputInfoStrings.Add("respones", $"Current respones is waiting:\t{currentResponesIsWating}");  //10
+            outputInfoStrings.Add("end_sep", "///////////////////////////////////////////////////////////");   //11
 
             Console.WriteLine("///////////////////////////////////////////////////////////");
             Console.WriteLine("_______________________SERVER INFO_________________________");
@@ -248,6 +271,108 @@ namespace SomeUsefulStuff
             Console.WriteLine("///////////////////////////////////////////////////////////");
         }
 
+
+        // Redraw some info in console {
+        private (int,int) getXYOfNumberInString(string _key)
+        {
+            int x = 0, y = 0;
+          
+            for (int i = 0; i < outputInfoStrings.Count; ++i)
+            {
+                if (outputInfoStrings.ToArray()[i].Key == _key)
+                {
+                    x = i;
+                    foreach (var ch in outputInfoStrings.ToArray()[i].Value)
+                    {
+                        if (ch == '\t')
+                        {
+                            for (int j = 8; j > 0; --j)
+                            {
+                                if (((y + j) % 8) == 0)
+                                {
+                                    y += j;
+                                    break;
+                                }
+                            }
+                            continue;
+                        }
+                        ++y;
+                    }
+
+                }
+            }
+
+            //forget last symbol
+            --y;
+            return (x,y);
+        }
+
+        // _keuValue is the key in Dictionary with strings
+        // _keyValue must be:
+        // "ipv4", "ipv6", "threads", "errors", "crashs", "logs", "work_state", 
+        // "connection_count", "respones"
+        public void redrawInfo(string _keyValue)
+        {
+            // User cursor position
+            int xu, yu;
+
+            consoleMutex.WaitOne();
+            (xu,yu) = Console.GetCursorPosition();
+
+            int x, y;
+            (x,y) = getXYOfNumberInString(_keyValue);
+            Console.SetCursorPosition(y, x);
+
+            switch (_keyValue)
+            {
+                case "ipv4":
+                    Console.Write(getCurrentMachineIP());
+                    break;
+
+                case "ipv6":
+                    Console.Write(getCurrentMachineIP("IPv6"));
+                    break;
+
+                case "threads":
+                    Console.Write(getCurrentThreadCount());
+                    break;
+
+                case "errors":
+                    Console.Write(LOG.getErrorCount());
+                    break;
+
+                case "crashs":
+                    Console.Write(LOG.getCrashCount());
+                    break;
+
+                case "logs":
+                    Console.Write(LOG.getLogCount());
+                    break;
+
+                case "work_state":
+                    Console.Write(serverIsWork.ToString());
+                    break;
+
+                case "connection_count":
+                    Console.Write(currentConnectionCount);
+                    break;
+
+                case "respones":
+                    Console.Write(currentResponesIsWating);
+                    break;
+
+                default:
+
+                    break;
+            }
+
+            Console.SetCursorPosition(xu, yu);
+
+            consoleMutex.ReleaseMutex();
+
+        }
+
+        // Redraw some info in console }
     }
 }
 
@@ -463,12 +588,13 @@ namespace CringeServer
 
             Task userTransactionsTask = Task.Run(() =>
             {
+                printServerInfo();
                 while (serverInfo.serverIsWork)
                 {
-                    printServerInfo();
-                    handler.printDBInfo();
-                    Thread.Sleep(500);
+                    string comand = Console.ReadLine();
                 }
+                
+
             });
             taskStorage.Add(userTransactionsTask);
 
