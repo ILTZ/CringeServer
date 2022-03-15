@@ -8,7 +8,8 @@ using System.Net;
 using System.Net.Sockets;
 using System.IO;
 
-using LOG = SomeUsefulStuff.LogginProcedures;
+using LOG = CringeServer.appInforamation;
+
 
 namespace CringeServer
 {

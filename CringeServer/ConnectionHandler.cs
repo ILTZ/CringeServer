@@ -9,118 +9,13 @@ using System.Threading;
 using System.IO;
 
 
-using LOG = SomeUsefulStuff.LogginProcedures;
-using DBinfo = SomeUsefulStuff.DataBaseInfo;
+using LOG = CringeServer.appInforamation;
+using DBinfo = CringeServer.appInforamation.dbInfo;
+
+
 
 namespace SomeUsefulStuff
-{
-    public static class DataBaseInfo
-    {
-        public const string serverName = @"MyPC\SQLEXPRESS";
-        public const string dataBaseName = "CringeDataBase";
-        public const string userName = @"BigBoss";
-        public const string password = "11112222";
-    }
-
-    public static class ServerConectionInfo
-    {
-        public static List<int> availablePorts = new List<int>();
-        public static List<string> availableIP = new List<string>();
-        public static int maxListeners = 50;
-    }
-
-    public static class LogginProcedures
-    {
-        public static bool writeLogs { get; set; }
-
-        private static int crashCount = 0;
-        private static int logCount = 0;
-        public static int errorCount = 0;
-
-
-        // _param define path and description of log.
-        // _param can be: "log"(default), "err" or "crash"
-        public static void printLogInFile(string _logMessage, string _param = "log")
-        {
-            if (!writeLogs)
-                return;
-
-            string endDirectory = "";
-            string logWord = "";
-
-            if (_param == "log")
-            {
-                endDirectory = @"\WorkLogs";
-                logWord = "::LOG::";
-                ++logCount;
-            }
-            else if (_param == "err")
-            {
-                endDirectory = @"\WorkLogs";
-                logWord = "::ERROR::";
-                ++errorCount;
-            }
-            else if (_param == "crash")
-            {
-                endDirectory = @"\CrushLogs";
-                logWord = "::CRUSH::";
-                ++crashCount;
-            }
-
-            if (!(Directory.Exists(Directory.GetParent(Directory.GetCurrentDirectory()).ToString() + @"\Logs")))
-            {
-                Directory.CreateDirectory(Directory.GetParent(Directory.GetCurrentDirectory()).ToString()
-                    + @"\Logs");
-            }
-            if (!(Directory.Exists(Directory.GetParent(Directory.GetCurrentDirectory()).ToString() + @"\Logs" + @"\WorkLogs")))
-            {
-                Directory.CreateDirectory(Directory.GetParent(Directory.GetCurrentDirectory()).ToString()
-                    + @"\Logs" + endDirectory);
-            }
-
-            string pathToFile = Directory.GetParent(Directory.GetCurrentDirectory()).ToString()
-                + @"\Logs" + (endDirectory + @"\") + (DateTime.Today.ToString("d") + "logs.txt");
-
-
-            // 
-            if (_param == "err")
-                File.AppendAllText(pathToFile, "************************ERROR************************\n");
-
-            File.AppendAllText(pathToFile, (DateTime.Now.ToLongTimeString() + logWord + _logMessage + "\n"));
-
-            if (_param == "err")
-                File.AppendAllText(pathToFile, "*****************************************************\n");
-            //
-        }
-
-
-        public static int getLogCount()
-        {
-            return logCount;
-        }
-        public static void dropLogCount()
-        {
-            crashCount = 0;
-        }
-        //
-        public static int getCrashCount()
-        {
-            return crashCount;
-        }
-        public static void dropCrashCount()
-        {
-            crashCount = 0;
-        }
-        //
-        public static int getErrorCount()
-        {
-            return errorCount;
-        }
-        public static void dropErrorCount()
-        {
-            errorCount = 0;
-        }
-    }
+{    
     public class ServerConnectionInformation
     {
         // Required variables {
@@ -208,171 +103,39 @@ namespace SomeUsefulStuff
         public void dropCurrentConnectionCount()
         {
             currentConnectionCount = 0;
-            redrawInfo("connection_count");
+            //redrawInfo("connection_count");
         }
         public void increseCurrentConnectionCount()
         {
             currentConnectionCount++;
-            redrawInfo("connection_count");
+            //redrawInfo("connection_count");
         }
         public void decreaseCurrentConnectionCount()
         {
             --currentConnectionCount;
-            redrawInfo("connection_count");
+            //redrawInfo("connection_count");
         }
         //
         //
         public void dropCurrentResponesIsWating()
         {
             currentResponesIsWating = 0;
-            redrawInfo("respones");
+            //redrawInfo("respones");
         }
         public void increaseCurrentResponesIsWating()
         {
             currentResponesIsWating++;
-            redrawInfo("respones");
+            //redrawInfo("respones");
         }
         public void decreaseCurrentResponesIsWating()
         {
             currentResponesIsWating--;
-            redrawInfo("respones");
+            //redrawInfo("respones");
         }
         //
         //
-        public void printCurrentServerInformation()
-        {
-            Console.Clear();
-
-            outputInfoStrings.Add("first_sep" ,"///////////////////////////////////////////////////////////");   //0
-            outputInfoStrings.Add("title" ,"_______________________SERVER INFO_________________________");   //1
-            outputInfoStrings.Add("ipv4" ,$"Current server IPv4:\t\t{getCurrentMachineIP()}");              //2
-            outputInfoStrings.Add("ipv6", $"Current server IPv6:\t\t{getCurrentMachineIP("IPv6")}");    //3
-            outputInfoStrings.Add("threads", $"Current thread/rwthread:\t{getCurrentThreadCount()}/{getCurrentThreadCount("maxrw")}"); //4
-            outputInfoStrings.Add("errors", $"Current error count:\t\t{LOG.getErrorCount()}");    //5
-            outputInfoStrings.Add("crashs", $"Current crash count:\t\t{LOG.getCrashCount()}");    //6
-            outputInfoStrings.Add("logs", $"Current log count:\t\t{LOG.getLogCount()}");    //7
-            outputInfoStrings.Add("work_state", $"Connection handler is work:\t" + serverIsWork.ToString());  //8
-            outputInfoStrings.Add("connection_count", $"Current connection count:\t{currentConnectionCount}");  //9
-            outputInfoStrings.Add("respones", $"Current respones is waiting:\t{currentResponesIsWating}");  //10
-            outputInfoStrings.Add("end_sep", "///////////////////////////////////////////////////////////");   //11
-
-            Console.WriteLine("///////////////////////////////////////////////////////////");
-            Console.WriteLine("_______________________SERVER INFO_________________________");
-            Console.WriteLine($"Current server IPv4:\t\t{getCurrentMachineIP()}");
-            Console.WriteLine($"Current server IPv6:\t\t{getCurrentMachineIP("IPv6")}");
-            Console.WriteLine($"Current thread/rwthread:\t{getCurrentThreadCount()}/{getCurrentThreadCount("maxrw")}");
-            Console.WriteLine($"Current error count:\t\t{LOG.getErrorCount()}");
-            Console.WriteLine($"Current crash count:\t\t{LOG.getCrashCount()}");
-            Console.WriteLine($"Current log count:\t\t{LOG.getLogCount()}");
-            Console.WriteLine($"Connection handler is work:\t" + serverIsWork.ToString());
-            Console.WriteLine($"Current connection count:\t{currentConnectionCount}");
-            Console.WriteLine($"Current respones is waiting:\t{currentResponesIsWating}");
-
-            Console.WriteLine("///////////////////////////////////////////////////////////");
-        }
 
 
-        // Redraw some info in console {
-        private (int,int) getXYOfNumberInString(string _key)
-        {
-            int x = 0, y = 0;
-          
-            for (int i = 0; i < outputInfoStrings.Count; ++i)
-            {
-                if (outputInfoStrings.ToArray()[i].Key == _key)
-                {
-                    x = i;
-                    foreach (var ch in outputInfoStrings.ToArray()[i].Value)
-                    {
-                        if (ch == '\t')
-                        {
-                            for (int j = 8; j > 0; --j)
-                            {
-                                if (((y + j) % 8) == 0)
-                                {
-                                    y += j;
-                                    break;
-                                }
-                            }
-                            continue;
-                        }
-                        ++y;
-                    }
-
-                }
-            }
-
-            //forget last symbol
-            --y;
-            return (x,y);
-        }
-
-        // _keuValue is the key in Dictionary with strings
-        // _keyValue must be:
-        // "ipv4", "ipv6", "threads", "errors", "crashs", "logs", "work_state", 
-        // "connection_count", "respones"
-        public void redrawInfo(string _keyValue)
-        {
-            // User cursor position
-            int xu, yu;
-
-            consoleMutex.WaitOne();
-            (xu,yu) = Console.GetCursorPosition();
-
-            int x, y;
-            (x,y) = getXYOfNumberInString(_keyValue);
-            Console.SetCursorPosition(y, x);
-
-            switch (_keyValue)
-            {
-                case "ipv4":
-                    Console.Write(getCurrentMachineIP());
-                    break;
-
-                case "ipv6":
-                    Console.Write(getCurrentMachineIP("IPv6"));
-                    break;
-
-                case "threads":
-                    Console.Write(getCurrentThreadCount());
-                    break;
-
-                case "errors":
-                    Console.Write(LOG.getErrorCount());
-                    break;
-
-                case "crashs":
-                    Console.Write(LOG.getCrashCount());
-                    break;
-
-                case "logs":
-                    Console.Write(LOG.getLogCount());
-                    break;
-
-                case "work_state":
-                    Console.Write(serverIsWork.ToString());
-                    break;
-
-                case "connection_count":
-                    Console.Write(currentConnectionCount);
-                    break;
-
-                case "respones":
-                    Console.Write(currentResponesIsWating);
-                    break;
-
-                default:
-
-                    break;
-            }
-
-            Console.SetCursorPosition(xu, yu);
-
-            consoleMutex.ReleaseMutex();
-
-        }
-
-        // Redraw some info in console }
     }
 }
 
@@ -437,7 +200,9 @@ namespace CringeServer
         public ConnectionHandler(int iPort = 8005, string iInputIP = "192.168.1.119", int iMaxListen = 50)
         {
             LOG.writeLogs = true;
-            
+            LOG.prepareConsoleOutput();
+
+
             // Init variables {
             serverInfo = new SomeUsefulStuff.ServerConnectionInformation(iPort, iInputIP, iMaxListen);
             // 
@@ -496,15 +261,6 @@ namespace CringeServer
 
 
             return false;
-        }
-
-
-        public void printServerInfo()
-        {
-            if (serverInfo != null)
-            {
-                serverInfo.printCurrentServerInformation();
-            }
         }
        
         private bool reconnectListenSocket()
@@ -588,10 +344,11 @@ namespace CringeServer
 
             Task userTransactionsTask = Task.Run(() =>
             {
-                printServerInfo();
+                //printServerInfo();
+                LOG.printAllInformation();
                 while (serverInfo.serverIsWork)
                 {
-                    string comand = Console.ReadLine();
+                    //string comand = Console.ReadLine();
                 }
                 
 
@@ -625,6 +382,8 @@ namespace CringeServer
             responesStorage.Add(new responesToUser(userID, comand));
 
             serverInfo.increaseCurrentResponesIsWating();
+            LOG.serverInfo.increaseCurrentResponesIsWating();
+
             LOG.printLogInFile($"Request from user ID={userID} " +
                 $"and command {comand} wass add in storage.");         
 
@@ -642,6 +401,8 @@ namespace CringeServer
                     responesStorage.Remove(it);
 
                     serverInfo.decreaseCurrentResponesIsWating();
+                    LOG.serverInfo.decreaseCurrentResponesIsWating();
+
                     LOG.printLogInFile($"Request from user ID={userID} " +
                         $"and command {comand} wass remove from storage.");
 
@@ -663,6 +424,8 @@ namespace CringeServer
             clientsSocket.Add(_socket);
 
             serverInfo.increseCurrentConnectionCount();
+            LOG.serverInfo.increseCurrentConnectionCount();
+
             LOG.printLogInFile($"Client with ID={_socket.clientID} was connected.");            
 
             mut.ReleaseMutex();

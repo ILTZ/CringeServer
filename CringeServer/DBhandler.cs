@@ -6,8 +6,8 @@ using System.Threading.Tasks;
 using System.Threading;
 using Microsoft.Data.SqlClient;
 
-using LOG = SomeUsefulStuff.LogginProcedures;
-using DBinfo = SomeUsefulStuff.DataBaseInfo;
+using LOG = CringeServer.appInforamation;
+using DBinfo = CringeServer.appInforamation.dbInfo;
 
 namespace CringeServer
 {
@@ -378,6 +378,7 @@ namespace CringeServer
                                 Thread.Sleep(500);
                             }
                             tempQ.sqlComand.Dispose();
+                            
                         });
                         break;
 
